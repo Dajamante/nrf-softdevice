@@ -58,7 +58,7 @@ async fn notify_adc_value<'a>(
         let dist: i16 = (elapsed / 58) as i16;
 
         // Try and notify the connected client of the new ADC value.
-        match server.bas.battery_level_notify(connection, &dist) {
+        match server.foo.foo_notify(connection, &dist) {
             Ok(_) => info!("Approximative distance: {=i16}", &dist),
             Err(_) => unwrap!(server.bas.battery_level_set(&dist)),
         };
@@ -79,9 +79,16 @@ struct BatteryService {
     battery_level: i16,
 }
 
+#[nrf_softdevice::gatt_service(uuid = "9e7312e0-2354-11eb-9f10-fbc30a62cf38")]
+struct FooService {
+    #[characteristic(uuid = "9e7312e0-2354-11eb-9f10-fbc30a63cf38", read, notify)]
+    foo: i16,
+}
+
 #[nrf_softdevice::gatt_server]
 struct Server {
     bas: BatteryService,
+    foo: FooService,
 }
 
 #[embassy_executor::main]
@@ -174,6 +181,11 @@ async fn main(spawner: Spawner) {
             ServerEvent::Bas(e) => match e {
                 BatteryServiceEvent::BatteryLevelCccdWrite { notifications } => {
                     info!("battery notifications: {}", notifications)
+                }
+            },
+            ServerEvent::Foo(e) => match e {
+                FooServiceEvent::FooCccdWrite { notifications } => {
+                    info!("notification: {}", notifications)
                 }
             },
         });
