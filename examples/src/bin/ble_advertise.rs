@@ -21,6 +21,29 @@ async fn softdevice_task(sd: &'static Softdevice) -> ! {
 async fn main(spawner: Spawner) {
     info!("Hello World!");
 
+    let config = softdevice_config();
+
+    let sd = Softdevice::enable(&config);
+    unwrap!(spawner.spawn(softdevice_task(sd)));
+
+    #[rustfmt::skip]
+    let adv_data = &[
+        0x02, raw::BLE_GAP_AD_TYPE_FLAGS as u8, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
+        0x03, raw::BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE as u8, 0x09, 0x18,
+        0x0a, raw::BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME as u8, b'H', b'e', b'l', b'l', b'o', b'R', b'u', b's', b't',
+    ];
+    #[rustfmt::skip]
+    let scan_data = &[
+        0x03, raw::BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE as u8, 0x09, 0x18,
+    ];
+
+    let mut config = peripheral::Config::default();
+    config.interval = 50;
+    let adv = peripheral::NonconnectableAdvertisement::ScannableUndirected { adv_data, scan_data };
+    unwrap!(peripheral::advertise(sd, adv, &config).await);
+}
+
+fn softdevice_config() -> nrf_softdevice::Config {
     let config = nrf_softdevice::Config {
         clock: Some(raw::nrf_clock_lf_cfg_t {
             source: raw::NRF_CLOCK_LF_SRC_RC as u8,
@@ -50,23 +73,5 @@ async fn main(spawner: Spawner) {
         }),
         ..Default::default()
     };
-
-    let sd = Softdevice::enable(&config);
-    unwrap!(spawner.spawn(softdevice_task(sd)));
-
-    #[rustfmt::skip]
-    let adv_data = &[
-        0x02, raw::BLE_GAP_AD_TYPE_FLAGS as u8, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
-        0x03, raw::BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE as u8, 0x09, 0x18,
-        0x0a, raw::BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME as u8, b'H', b'e', b'l', b'l', b'o', b'R', b'u', b's', b't',
-    ];
-    #[rustfmt::skip]
-    let scan_data = &[
-        0x03, raw::BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE as u8, 0x09, 0x18,
-    ];
-
-    let mut config = peripheral::Config::default();
-    config.interval = 50;
-    let adv = peripheral::NonconnectableAdvertisement::ScannableUndirected { adv_data, scan_data };
-    unwrap!(peripheral::advertise(sd, adv, &config).await);
+    config
 }
