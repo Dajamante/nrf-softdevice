@@ -1,22 +1,21 @@
-//! OBSOLETE COMMENT:
-//! Keeping now for writing the example.
-//! This example showcases how to notify a connected client via BLE of new SAADC data.
-//! Using, for example, nRF-Connect on iOS/Android we can connect to the device "HelloRust"
-//! and see the battery level characteristic getting updated in real-time.
+//! This example demonstrates how to use BLE (Bluetooth Low Energy) to notify a connected client
+//! about distance data obtained from a distance sensor.
 //!
-//! The SAADC is initialized in single-ended mode and a single measurement is taken every second.
-//! This value is then used to update the battery_level characteristic.
-//! We are using embassy-time for time-keeping purposes.
-//! Everytime a new value is recorded, it gets sent to the connected clients via a GATT Notification.
+//! Using a BLE client application like nRF-Connect on iOS/Android, one can connect to the device
+//! with the name "HelloRust" and subscribe to distance notifications.
 //!
-//! The ADC doesn't gather data unless a valid connection exists with a client. This is guaranteed
-//! by using the "select" crate to wait for either the `gatt_server::run` future or the `adc_fut` future
-//! to complete.
+//! The program initializes GPIO pins for the distance sensor (trigger and echo pins) and then starts
+//! sending trigger signals. It measures the echo response time to calculate the distance.
 //!
-//! Only a single BLE connection is supported in this example so that RAM usage remains minimal.
+//! The distance is calculated approximately every second and updated in the DistanceService
+//! characteristic. Connected clients that have subscribed to notifications for this characteristic
+//! will be updated in real-time.
 //!
-//! The internal RC oscillator is used to generate the LFCLK.
+//! The embassy-time library is used for time-keeping purposes.
 //!
+//! The "select" crate is used to concurrently wait for either the `gatt_server::run` future or
+//! the `notify_dist_value` future to complete. This ensures that distance data is gathered and
+//! notifications are sent only when a client is actually connected, thus saving power.
 
 #![no_std]
 #![no_main]
@@ -50,6 +49,7 @@ async fn notify_dist_value<'a>(
         Timer::after(Duration::from_micros(10)).await;
         trig.set_low();
 
+        // We assume the echo is not high, this is error handling
         echo.wait_for_high().await;
         let triggered_at = Instant::now();
         echo.wait_for_low().await;
@@ -100,11 +100,6 @@ async fn main(spawner: Spawner) -> ! {
     // Initialise pins for distance sensor
     let mut trig: Output<'_, AnyPin> = Output::new(p.P0_03.degrade(), Level::Low, OutputDrive::Standard);
     let mut echo: Input<'_, AnyPin> = Input::new(p.P0_04.degrade(), Pull::Down);
-
-    // Initialisation of the distance sensor, needs to be up for 10 micro to get started
-    trig.set_high();
-    Timer::after(Duration::from_micros(10)).await;
-    trig.set_low();
 
     let config = softdevice_config();
 
